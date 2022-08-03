@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"google.golang.org/api/iterator"
 	"os"
 	"runtime"
 	"strings"
@@ -77,6 +78,9 @@ func create(ctx context.Context, projectID string, topics Topics) error {
 
 		for subs := topic.Subscriptions(ctx); ; {
 			sub, err := subs.Next()
+			if err == iterator.Done {
+				break
+			}
 			if err != nil {
 				return fmt.Errorf("Unable to list subscriptions for topic %q for project %q: %s", topicID, projectID, err)
 			}
