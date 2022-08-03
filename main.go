@@ -56,12 +56,37 @@ func create(ctx context.Context, projectID string, topics Topics) error {
 
 	for topicID, subscriptions := range topics {
 		debugf("  Creating topic %q", topicID)
-		topic, err := client.CreateTopic(ctx, topicID)
+		var err error
+		topic := client.Topic(topicID)
+		exists, err := topic.Exists(ctx)
 		if err != nil {
-			return fmt.Errorf("Unable to create topic %q for project %q: %s", topicID, projectID, err)
+			return fmt.Errorf("Unable to check topic %q existance for project %q: %s", topicID, projectID, err)
+		}
+		if !exists {
+			t, err := client.CreateTopic(ctx, topicID)
+			if err != nil {
+				return fmt.Errorf("Unable to create topic %q for project %q: %s", topicID, projectID, err)
+			}
+			topic = t
 		}
 
+		subsToCreate := make(map[string]interface{})
 		for _, subscriptionID := range subscriptions {
+			subsToCreate[subscriptionID] = nil
+		}
+
+		for subs := topic.Subscriptions(ctx); ; {
+			sub, err := subs.Next()
+			if err != nil {
+				return fmt.Errorf("Unable to list subscriptions for topic %q for project %q: %s", topicID, projectID, err)
+			}
+			if sub == nil {
+				break
+			}
+			delete(subsToCreate, sub.ID())
+		}
+
+		for subscriptionID := range subsToCreate {
 			debugf("    Creating subscription %q", subscriptionID)
 			_, err = client.CreateSubscription(ctx, subscriptionID, pubsub.SubscriptionConfig{Topic: topic})
 			if err != nil {
